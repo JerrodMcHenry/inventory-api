@@ -17,3 +17,17 @@ def test_get_existing_product():
         "price": 49.99,
         "quantity": 20 
     }
+    
+
+def test_get_missing_profuct():
+    products = {
+        101: {
+            "name": "Keyboard",
+            "price": 49.99,
+            "quantity": 20
+        }
+    }
+    
+    result = get_product(products, 999)
+    
+    assert result == None
