@@ -1,3 +1,11 @@
+
+from exceptions import (
+    ProductNotFoundError,
+    DuplicateProductError,
+    InsufficientStockError,
+)
+
+
 def get_product(products: dict, product_id: int):
     """Retrieve a product by ID, or return None if it doesn't exist."""
     return products.get(product_id)
@@ -64,7 +72,7 @@ def update_stock(
 
     # 4. Prevent negative inventory
     if new_quantity < 0:
-        raise ValueError("Insufficient stock")
+        raise InsufficientStockError("Insufficient stock")
 
     # 5. Update the existing product
     product["quantity"] = new_quantity

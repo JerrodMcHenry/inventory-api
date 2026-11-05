@@ -10,6 +10,12 @@ from inventory import (
     delete_product,
 )
 
+from exceptions import (
+    ProductNotFoundError,
+    DuplicateProductError,
+    InsufficientStockError,
+)
+
 app = FastAPI(
     title="Inventory API",
     description="A REST API for managing warehouse inventory",
@@ -84,18 +90,19 @@ def change_stock(product_id: int, data: StockUpdate):
             product_id,
             data.quantity_change,
         )
-    except ValueError as error:
-        if str(error) == "Product does not exist":
-            code = 404
-        else:
-            code = 409
-
+    except ProductNotFoundError as error:
         raise HTTPException(
-            status_code=code,
+            status_code=404,
+            detail=str(error),
+        ) from error
+    except InsufficientStockError as error:
+        raise HTTPException(
+            status_code=409,
             detail=str(error),
         ) from error
 
     return {"id": product_id, **product}
+
 
 
 @app.delete("/products/{product_id}")
