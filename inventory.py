@@ -1,23 +1,8 @@
-products = {
-    101: {
-        "name": "Keyboard",
-        "price": 49.99,
-        "quantity": 20
-    },
-    102: {
-        "name": "Mouse",
-        "price": 24.99,
-        "quantity": 15
-    }
-}
+def get_product(products: dict, product_id: int):
+    """Retrieve a product by ID, or return None if it doesn't exist."""
+    return products.get(product_id)
 
 
-def get_product(products, product_id: int):
-    product = products.get(product_id)
-    return product
-    
-    
-    
 def create_product(
     products: dict,
     product_id: int,
@@ -25,15 +10,64 @@ def create_product(
     price: float,
     quantity: int
 ):
+    """Validate and add a new product to inventory."""
+
     if product_id in products:
         raise ValueError("This ID is in use. Try again")
-    
+
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("Product name cannot be empty")
+
+    if isinstance(price, bool) or not isinstance(price, (int, float)):
+        raise ValueError("Product price must be a number")
+
+    if price < 0:
+        raise ValueError("Product price cannot be negative")
+
+    if isinstance(quantity, bool) or not isinstance(quantity, int):
+        raise ValueError("Product quantity must be an integer")
+
+    if quantity < 0:
+        raise ValueError("Product quantity cannot be negative")
+
     product = {
         "name": name,
         "price": price,
         "quantity": quantity
     }
-    
+
     products[product_id] = product
-    
+
+    return product
+
+
+
+def update_stock(
+    products: dict,
+    product_id: int,
+    quantity_change: int
+):
+    """Update the stock quantity of an existing product."""
+
+    # 1. Find the product
+    product = products.get(product_id)
+
+    if product is None:
+        raise ValueError("Product does not exist")
+
+    # 2. Validate the quantity change
+    if isinstance(quantity_change, bool) or not isinstance(quantity_change, int):
+        raise ValueError("Quantity change must be an integer")
+
+    # 3. Calculate the new quantity
+    new_quantity = product["quantity"] + quantity_change
+
+    # 4. Prevent negative inventory
+    if new_quantity < 0:
+        raise ValueError("Insufficient stock")
+
+    # 5. Update the existing product
+    product["quantity"] = new_quantity
+
+    # 6. Return the updated product
     return product
