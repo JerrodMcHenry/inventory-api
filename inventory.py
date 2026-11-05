@@ -71,3 +71,12 @@ def update_stock(
 
     # 6. Return the updated product
     return product
+
+
+def delete_product(products: dict, product_id: int):
+    """Delete a product by ID and return the removed product."""
+
+    if product_id not in products:
+        raise ValueError("Product does not exist")
+
+    return products.pop(product_id)

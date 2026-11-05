@@ -1,6 +1,6 @@
 import pytest
 
-from inventory import get_product, create_product
+from inventory import get_product, create_product, update_stock, delete_product
 
 
 @pytest.fixture
@@ -128,3 +128,103 @@ def test_create_product_zero_price_and_quantity():
     assert result["price"] == 0
     assert result["quantity"] == 0
     assert 103 in products
+    
+def test_update_stock_increase():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    result = update_stock(products, 101, 15)
+
+    assert result["quantity"] == 35
+    assert products[101]["quantity"] == 35
+
+
+def test_update_stock_decrease():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    result = update_stock(products, 101, -5)
+
+    assert result["quantity"] == 15
+
+
+def test_update_stock_insufficient_stock():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    with pytest.raises(ValueError, match="Insufficient stock"):
+        update_stock(products, 101, -25)
+
+    assert products[101]["quantity"] == 20
+
+
+def test_update_stock_missing_product():
+    products = {}
+
+    with pytest.raises(ValueError, match="Product does not exist"):
+        update_stock(products, 999, 10)
+
+
+@pytest.mark.parametrize("quantity_change", [2.5, "10", None, True])
+def test_update_stock_invalid_quantity_change(quantity_change):
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    with pytest.raises(ValueError, match="Quantity change must be an integer"):
+        update_stock(products, 101, quantity_change)
+
+    assert products[101]["quantity"] == 20
+
+
+def test_update_stock_to_zero():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    result = update_stock(products, 101, -20)
+
+    assert result["quantity"] == 0
+    
+def test_delete_existing_product():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20},
+        102: {"name": "Mouse", "price": 24.99, "quantity": 15}
+    }
+
+    deleted = delete_product(products, 101)
+
+    assert deleted == {
+        "name": "Keyboard",
+        "price": 49.99,
+        "quantity": 20
+    }
+
+    assert 101 not in products
+    assert 102 in products
+
+
+def test_delete_missing_product():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    with pytest.raises(ValueError, match="Product does not exist"):
+        delete_product(products, 999)
+
+    assert 101 in products
+    assert len(products) == 1
+
+
+def test_delete_last_product():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    deleted = delete_product(products, 101)
+
+    assert deleted["name"] == "Keyboard"
+    assert products == {}
