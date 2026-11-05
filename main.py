@@ -1,8 +1,19 @@
 
-from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel, Field, ConfigDict
+from decimal import Decimal
+from typing import Annotated
 
-from inventory import (
+from fastapi import Depends, FastAPI, HTTPException, status
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from database import get_db
+from exceptions import (
+    ProductNotFoundError,
+    InsufficientStockError,
+)
+from models import Product
+from product_repository import (
     get_product,
     list_products,
     create_product,
@@ -10,26 +21,23 @@ from inventory import (
     delete_product,
 )
 
-from exceptions import (
-    ProductNotFoundError,
-    DuplicateProductError,
-    InsufficientStockError,
-)
 
 app = FastAPI(
     title="Inventory API",
     description="A REST API for managing warehouse inventory",
-    version="0.2.0",
+    version="0.3.0",
 )
 
+
+# Request models
 
 class ProductCreate(BaseModel):
     model_config = ConfigDict(strict=True)
 
     id: int = Field(gt=0)
-    name: str = Field(min_length=1)
-    price: float = Field(ge=0, allow_inf_nan=False)
-    quantity: int = Field(ge=0)
+    name: str = Field(min_length=1, max_length=100)
+    price: float = Field(ge=0, le=99999999.99, allow_inf_nan=False)
+    quantity: int = Field(ge=0, le=2147483647)
 
 
 class StockUpdate(BaseModel):
@@ -38,81 +46,114 @@ class StockUpdate(BaseModel):
     quantity_change: int
 
 
-# Temporary storage until we introduce PostgreSQL.
-products = {
-    101: {"name": "Keyboard", "price": 49.99, "quantity": 20},
-    102: {"name": "Mouse", "price": 24.99, "quantity": 15},
-}
+# Response model
+
+class ProductResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    price: Decimal
+    quantity: int
 
 
-@app.get("/products")
-def get_products():
-    return list_products(products)
+DatabaseSession = Annotated[Session, Depends(get_db)]
 
 
-@app.get("/products/{product_id}")
-def get_product_by_id(product_id: int):
-    product = get_product(products, product_id)
+# GET all products
+
+@app.get("/products", response_model=list[ProductResponse])
+def read_products(session: DatabaseSession):
+    return list_products(session)
+
+
+# GET one product
+
+@app.get("/products/{product_id}", response_model=ProductResponse)
+def read_product(product_id: int, session: DatabaseSession):
+    product = get_product(session, product_id)
 
     if product is None:
         raise HTTPException(
             status_code=404,
-            detail="Product does not exist",
+            detail="Product not found",
         )
 
-    return {"id": product_id, **product}
+    return product
 
 
-@app.post("/products", status_code=status.HTTP_201_CREATED)
-def add_product(data: ProductCreate):
+# CREATE product
+
+@app.post(
+    "/products",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ProductResponse,
+)
+def add_product(data: ProductCreate, session: DatabaseSession):
     try:
-        product = create_product(
-            products,
-            data.id,
-            data.name,
-            data.price,
-            data.quantity,
+        return create_product(
+            session=session,
+            product_id=data.id,
+            name=data.name,
+            price=Decimal(str(data.price)),
+            quantity=data.quantity,
         )
-    except ValueError as error:
-        raise HTTPException(
-            status_code=409,
-            detail=str(error),
-        ) from error
 
-    return {"id": data.id, **product}
+    except IntegrityError as error:
+        session.rollback()
+
+        if get_product(session, data.id) is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Product already exists",
+            ) from error
+
+        raise
 
 
-@app.patch("/products/{product_id}/stock")
-def change_stock(product_id: int, data: StockUpdate):
+# UPDATE stock
+
+@app.patch(
+    "/products/{product_id}/stock",
+    response_model=ProductResponse,
+)
+def change_stock(
+    product_id: int,
+    data: StockUpdate,
+    session: DatabaseSession,
+):
     try:
-        product = update_stock(
-            products,
+        return update_stock(
+            session,
             product_id,
             data.quantity_change,
         )
+
     except ProductNotFoundError as error:
         raise HTTPException(
             status_code=404,
             detail=str(error),
         ) from error
+
     except InsufficientStockError as error:
         raise HTTPException(
             status_code=409,
             detail=str(error),
         ) from error
 
-    return {"id": product_id, **product}
 
+# DELETE product
 
-
-@app.delete("/products/{product_id}")
-def remove_product(product_id: int):
+@app.delete(
+    "/products/{product_id}",
+    response_model=ProductResponse,
+)
+def remove_product(product_id: int, session: DatabaseSession):
     try:
-        deleted = delete_product(products, product_id)
-    except ValueError as error:
+        return delete_product(session, product_id)
+
+    except ProductNotFoundError as error:
         raise HTTPException(
             status_code=404,
             detail=str(error),
         ) from error
-
-    return {"id": product_id, **deleted}
