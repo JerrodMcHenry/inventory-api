@@ -80,3 +80,19 @@ def delete_product(products: dict, product_id: int):
         raise ValueError("Product does not exist")
 
     return products.pop(product_id)
+
+
+def list_products(products: dict) -> list:
+    """Return all products as a list, including their IDs."""
+
+    result = []
+
+    for product_id, product in products.items():
+        product_data = {
+            "id": product_id,
+            **product
+        }
+
+        result.append(product_data)
+
+    return result

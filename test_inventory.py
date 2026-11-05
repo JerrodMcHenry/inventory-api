@@ -1,6 +1,6 @@
 import pytest
 
-from inventory import get_product, create_product, update_stock, delete_product
+from inventory import get_product, create_product, update_stock, delete_product, list_products
 
 
 @pytest.fixture
@@ -228,3 +228,50 @@ def test_delete_last_product():
 
     assert deleted["name"] == "Keyboard"
     assert products == {}
+    
+def test_list_products():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20},
+        102: {"name": "Mouse", "price": 24.99, "quantity": 15}
+    }
+
+    result = list_products(products)
+
+    assert result == [
+        {"id": 101, "name": "Keyboard", "price": 49.99, "quantity": 20},
+        {"id": 102, "name": "Mouse", "price": 24.99, "quantity": 15}
+    ]
+
+
+def test_list_products_empty():
+    products = {}
+
+    result = list_products(products)
+
+    assert result == []
+
+
+def test_list_products_does_not_modify_inventory():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    original = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    list_products(products)
+
+    assert products == original
+
+
+def test_list_products_returns_independent_dictionaries():
+    products = {
+        101: {"name": "Keyboard", "price": 49.99, "quantity": 20}
+    }
+
+    result = list_products(products)
+
+    result[0]["quantity"] = 999
+
+    assert products[101]["quantity"] == 20
